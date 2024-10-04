@@ -1,0 +1,148 @@
+import tkinter as tk
+from tkinter import messagebox
+import matplotlib.pyplot as plt
+import serial
+import threading
+import time
+
+# Serial communication setup
+ser = serial.Serial('COM3', 115200, timeout=1)  # Adjust COM port to your setup
+
+# Initialize variables for PID and graph
+angle_data = []
+time_data = []
+kp, ki, kd = 1.0, 0.5, 0.1
+setpoint = 0
+output_limit_min = -255
+output_limit_max = 255
+is_running = True  # Flag to control when to stop the reading thread
+
+# Function to update PID values
+def update_pid():
+    global kp, ki, kd, setpoint, output_limit_min, output_limit_max
+    try:
+        kp = float(kp_entry.get())
+        ki = float(ki_entry.get())
+        kd = float(kd_entry.get())
+        setpoint = float(setpoint_entry.get())
+        output_limit_min = float(output_min_entry.get())
+        output_limit_max = float(output_max_entry.get())
+        
+        # Send the updated PID values to ESP32 via serial
+        ser.write(f"Kp:{kp},Ki:{ki},Kd:{kd},Setpoint:{setpoint},OutputMin:{output_limit_min},OutputMax:{output_limit_max}\n".encode())
+        messagebox.showinfo("Info", "PID values updated successfully!")
+    except ValueError:
+        messagebox.showerror("Error", "Invalid input. Please enter valid numbers.")
+
+# Function to calibrate the MPU6050
+def calibrate_mpu():
+    # Send a command to ESP32 to calibrate the MPU6050
+    ser.write("CALIBRATE\n".encode())
+    messagebox.showinfo("Info", "MPU6050 calibration in progress. Please wait...")
+    
+    # Wait for the ESP32 to send a calibration completion message
+    while True:
+        line = ser.readline().decode('utf-8').strip()
+        if "CALIBRATION DONE" in line:
+            messagebox.showinfo("Info", "MPU6050 calibration complete!")
+            break
+
+# Function to read angle data from ESP32 and update the graph
+def read_angle():
+    global time_data, angle_data, is_running
+    start_time = time.time()
+    
+    while is_running:
+        line = ser.readline().decode('utf-8').strip()
+        if line.startswith("Angle X:"):
+            try:
+                angle = float(line.split(":")[1].split("|")[0].strip())
+                current_time = time.time() - start_time
+
+                # Update data for graph
+                angle_data.append(angle)
+                time_data.append(current_time)
+
+                # Limit data points to the last 100
+                if len(time_data) > 100:
+                    time_data.pop(0)
+                    angle_data.pop(0)
+
+                # Plotting real-time data
+                ax.clear()
+                ax.plot(time_data, angle_data)
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('Angle X (degrees)')
+                ax.set_title('Real-Time Angle X Plot')
+                plt.draw()
+                plt.pause(0.01)
+            except Exception as e:
+                print(f"Error parsing line: {e}")
+
+# Function to close the program and stop the reading thread
+def close_program():
+    global is_running
+    is_running = False
+    plt.close()  # Close the matplotlib plot
+    root.quit()  # Close the tkinter window
+
+# Set up the GUI with Tkinter
+root = tk.Tk()
+root.title("PID Controller Tuning")
+
+# Labels and entry boxes for Kp, Ki, Kd, Setpoint, and Output Limits
+tk.Label(root, text="Kp:").grid(row=0, column=0)
+kp_entry = tk.Entry(root)
+kp_entry.grid(row=0, column=1)
+kp_entry.insert(0, str(kp))
+
+tk.Label(root, text="Ki:").grid(row=1, column=0)
+ki_entry = tk.Entry(root)
+ki_entry.grid(row=1, column=1)
+ki_entry.insert(0, str(ki))
+
+tk.Label(root, text="Kd:").grid(row=2, column=0)
+kd_entry = tk.Entry(root)
+kd_entry.grid(row=2, column=1)
+kd_entry.insert(0, str(kd))
+
+tk.Label(root, text="Setpoint:").grid(row=3, column=0)
+setpoint_entry = tk.Entry(root)
+setpoint_entry.grid(row=3, column=1)
+setpoint_entry.insert(0, str(setpoint))
+
+tk.Label(root, text="Output Min:").grid(row=4, column=0)
+output_min_entry = tk.Entry(root)
+output_min_entry.grid(row=4, column=1)
+output_min_entry.insert(0, str(output_limit_min))
+
+tk.Label(root, text="Output Max:").grid(row=5, column=0)
+output_max_entry = tk.Entry(root)
+output_max_entry.grid(row=5, column=1)
+output_max_entry.insert(0, str(output_limit_max))
+
+# Button to update the PID values
+update_button = tk.Button(root, text="Update PID", command=update_pid)
+update_button.grid(row=6, columnspan=2)
+
+# Button to trigger MPU6050 calibration
+calibrate_button = tk.Button(root, text="Calibrate MPU6050", command=calibrate_mpu)
+calibrate_button.grid(row=7, columnspan=2)
+
+# Button to close the program
+close_button = tk.Button(root, text="Close", command=close_program)
+close_button.grid(row=8, columnspan=2)
+
+# Set up the matplotlib figure for real-time plotting
+fig, ax = plt.subplots()
+plt.ion()  # Enable interactive mode for real-time plotting
+
+# Start the angle reading thread
+threading.Thread(target=read_angle, daemon=True).start()
+
+# Run the Tkinter main loop
+root.mainloop()
+
+
+# part 2 
+

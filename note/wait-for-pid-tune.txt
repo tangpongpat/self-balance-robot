@@ -1,0 +1,134 @@
+#include <Wire.h>
+#include <MPU6050_light.h>
+#include <PID_v1.h>
+
+// กำหนดขาพินสำหรับมอเตอร์และเซ็นเซอร์ MPU6050
+#define DIR1 4    // Direction pin for Motor A
+#define PWM1 2    // PWM pin for Motor A
+#define DIR2 13   // Direction pin for Motor B
+#define PWM2 12   // PWM pin for Motor B
+
+// กำหนดพารามิเตอร์ของหุ่นยนต์
+const float WHEEL_RADIUS = 0.0345;  // หน้ายางล้อ 34.5 มม.
+const float WHEEL_DISTANCE = 0.170; // ระยะห่างระหว่างล้อ 170 มม.
+
+// สร้างออบเจ็กต์ของ MPU6050
+MPU6050 mpu(Wire);
+
+// ตัวแปรสำหรับ PID control
+double setpoint = 0;    // จุดตั้งสมดุล (0 องศา)
+double input = 0;       // มุมที่ได้จาก MPU6050 (มุมเอียงในแกน X)
+double output = 0;      // เอาต์พุตของ PID สำหรับควบคุมมอเตอร์
+double Kp = 5.5, Ki = 4.3, Kd = 0.1;  // ค่าการจูน PID
+double deadband = 0.13; // Deadband value for angle adjustments
+unsigned long previousMillis = 0; // Stores the last time the angle was updated
+const long interval = 10; // Interval for updating angle (10 ms)
+
+// สร้าง PID object
+PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+
+// ฟังก์ชันควบคุมความเร็วของมอเตอร์
+void setMotorSpeeds(double speed) {
+  if (speed > 0) {
+    digitalWrite(DIR1, HIGH);  
+  } else {
+    digitalWrite(DIR1, LOW);   
+  }
+  analogWrite(PWM1, abs(speed));
+
+  if (speed > 0) {
+    digitalWrite(DIR2, LOW);  
+  } else {
+    digitalWrite(DIR2, HIGH); 
+  }
+  analogWrite(PWM2, abs(speed));  
+}
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+  byte status = mpu.begin();
+  if (status != 0) {
+    Serial.println("MPU6050 initialization failed!");
+    while (1);
+  }
+  mpu.calcOffsets();
+  myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(-250, 250);
+  pinMode(DIR1, OUTPUT);
+  pinMode(PWM1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  pinMode(PWM2, OUTPUT);
+  Serial.println("MPU6050 Initialized and Calibrated");
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    if (Serial.available()) {
+      String command = Serial.readStringUntil('\n');
+      if (command == "NEW_CALIBRATE") {
+        mpu.calcOffsets();
+        Serial.println("NEW CALIBRATION DONE");
+      } 
+      else if (command.startsWith("SETPOINT")) {
+        setpoint = command.substring(9).toFloat();
+        Serial.print("Setpoint updated to: ");
+        Serial.println(setpoint);
+      } 
+      else if (command.startsWith("Kp")) {
+        Kp = command.substring(3).toFloat();
+        myPID.SetTunings(Kp, Ki, Kd);
+        Serial.print("Kp updated to: ");
+        Serial.println(Kp);
+      } 
+      else if (command.startsWith("Ki")) {
+        Ki = command.substring(3).toFloat();
+        myPID.SetTunings(Kp, Ki, Kd);
+        Serial.print("Ki updated to: ");
+        Serial.println(Ki);
+      } 
+      else if (command.startsWith("Kd")) {
+        Kd = command.substring(3).toFloat();
+        myPID.SetTunings(Kp, Ki, Kd);
+        Serial.print("Kd updated to: ");
+        Serial.println(Kd);
+      } 
+      else if (command.startsWith("DEADBAND")) {
+        deadband = command.substring(9).toFloat(); // Expects format "DEADBAND <value>"
+        Serial.print("Deadband updated to: ");
+        Serial.println(deadband);
+      }
+    }
+
+    mpu.update();
+    input = -mpu.getAngleX(); // Adjust for upside-down
+
+    // Use deadband to check if the input is significant
+    if (abs(input) > deadband) {
+      myPID.Compute();
+      setMotorSpeeds(output);
+      Serial.print("Angle X: ");
+      Serial.print(input);
+      Serial.print(" | Motor Speed: ");
+      Serial.print(output);
+      Serial.print(" | Setpoint: ");
+      Serial.print(setpoint);
+      Serial.print(" | Deadband: ");
+      Serial.println(deadband);
+      Serial.print(" | Kp: ");
+      Serial.print(Kp);
+      Serial.print(" | Ki: ");
+      Serial.print(Ki);
+      Serial.print(" | Kd: ");
+      Serial.println(Kd);
+    } else {
+      Serial.println("Robot is stable.");
+    }
+  }
+}
+
+

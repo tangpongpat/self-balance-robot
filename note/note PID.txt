@@ -1,0 +1,129 @@
+Kp = 5.7, Ki = 5, Kd = 0.1;
+
+
+
+
+#include <Wire.h>
+#include <MPU6050_light.h>
+#include <PID_v1.h>
+
+// กำหนดขาพินสำหรับมอเตอร์และเซ็นเซอร์ MPU6050
+#define DIR1 4    // Direction pin for Motor A
+#define PWM1 2    // PWM pin for Motor A
+#define DIR2 13   // Direction pin for Motor B
+#define PWM2 12   // PWM pin for Motor B
+
+// กำหนดพารามิเตอร์ของหุ่นยนต์
+const float WHEEL_RADIUS = 0.0345;  // หน้ายางล้อ 34.5 มม.
+const float WHEEL_DISTANCE = 0.170; // ระยะห่างระหว่างล้อ 170 มม.
+
+// สร้างออบเจ็กต์ของ MPU6050
+MPU6050 mpu(Wire);
+
+// ตัวแปรสำหรับ PID control
+double setpoint = 3;    // จุดตั้งสมดุล (0 องศา)
+double input = 0;       // มุมที่ได้จาก MPU6050 (มุมเอียงในแกน X)
+double output = 0;      // เอาต์พุตของ PID สำหรับควบคุมมอเตอร์
+double Kp = 5.7, Ki = 5.2, Kd = 0.07;  // ค่าการจูน PID
+unsigned long previousMillis = 0; // Stores the last time the angle was updated
+const long interval = 10; // Interval for updating angle (10 ms)
+
+// สร้าง PID object
+PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+
+// ฟังก์ชันควบคุมความเร็วของมอเตอร์
+void setMotorSpeeds(double speed) {
+  // ควบคุมมอเตอร์ A (ล้อซ้าย)
+  if (speed > 0) {
+    digitalWrite(DIR1, HIGH);  // หมุนไปข้างหน้า
+  } else {
+    digitalWrite(DIR1, LOW);   // หมุนถอยหลัง
+  }
+  analogWrite(PWM1, abs(speed));  // ควบคุมความเร็ว (0-255)
+
+  // ควบคุมมอเตอร์ B (ล้อขวา)
+  if (speed > 0) {
+    digitalWrite(DIR2, LOW);  // หมุนไปข้างหน้า (ทิศทางตรงข้าม)
+  } else {
+    digitalWrite(DIR2, HIGH); // หมุนถอยหลัง
+  }
+  analogWrite(PWM2, abs(speed));  // ควบคุมความเร็ว (0-255)
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  // เริ่มต้นการสื่อสาร I2C กับ MPU6050
+  Wire.begin(21, 22);
+
+  // เริ่มต้น MPU6050
+  byte status = mpu.begin();
+  if (status != 0) {
+    Serial.println("MPU6050 initialization failed!");
+    while (1);
+  }
+
+  // คาลิเบรตเซ็นเซอร์ MPU6050
+  mpu.calcOffsets();  // Takes about 5-10 seconds to calibrate
+
+  // เริ่มต้น PID controller
+  myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(-250, 250);
+
+  // กำหนดพินสำหรับมอเตอร์
+  pinMode(DIR1, OUTPUT);
+  pinMode(PWM1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  pinMode(PWM2, OUTPUT);
+
+  Serial.println("MPU6050 Initialized and Calibrated");
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Check if it's time to update the angle
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    // Check for incoming serial data
+    if (Serial.available()) {
+      String command = Serial.readStringUntil('\n');
+      
+      if (command == "CALIBRATE") {
+        mpu.calcOffsets();
+        Serial.println("CALIBRATION DONE");
+      }
+    }
+
+    // Update MPU6050 data
+    mpu.update();
+
+    // Read the angle X (Pitch) from MPU6050 and adjust for upside-down
+    input = -mpu.getAngleX(); // ปรับค่าเป็นลบเพื่อให้ถูกต้องเมื่อกลับหัว
+
+    // If the angle is greater than 0.01 degrees, activate PID and motors
+    if (abs(input) > 0.01) {
+      myPID.Compute();
+      setMotorSpeeds(output);
+      Serial.print("Angle X: ");
+      Serial.print(input);
+      Serial.print(" | Motor Speed: ");
+      Serial.println(output);
+    } else {
+      Serial.println("Robot is stable.");
+    }
+  }
+}
+
+-----------------CMD Arduino--------------------
+SETPOINT 0.1
+Kp = 5.5
+Ki = 4.3 
+Kd = 0.1
+NEW_CALIBRATE
+DEADBAND 0.05
+
+p 5.7
+i 11
+d 00

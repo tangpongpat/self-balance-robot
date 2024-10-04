@@ -1,0 +1,241 @@
+#include <ps5Controller.h>  // Include the PS5 controller library
+
+// Motor control pins
+#define DIR1 4  // Motor A direction pin
+#define PWM1 2  // Motor A PWM pin
+#define DIR2 13 // Motor B direction pin
+#define PWM2 12 // Motor B PWM pin
+
+// PID tuning parameters
+float Kp = 1.0, Ki = 0.5, Kd = 0.1;
+float pid_output, error, previous_error = 0;
+float integral = 0, derivative = 0;
+float setpoint = 0;  // Desired value (e.g., 0 degrees for upright balance)
+float input = 0;     // Current feedback value (e.g., from a sensor)
+
+bool controllerConnected = false;  // Flag to track controller connection state
+
+// Placeholder for getting sensor value (replace with actual sensor read)
+float getSensorValue() {
+  return analogRead(34);  // Replace with actual sensor input
+}
+
+// Placeholder for setting motor speed (based on PID output)
+void setMotorSpeed(float pid_output) {
+  if (pid_output > 0) {
+    digitalWrite(DIR1, HIGH); // Forward for Motor A
+    analogWrite(PWM1, abs(pid_output)); // Set speed for Motor A
+    digitalWrite(DIR2, HIGH); // Forward for Motor B
+    analogWrite(PWM2, abs(pid_output)); // Set speed for Motor B
+  } else {
+    digitalWrite(DIR1, LOW); // Reverse for Motor A
+    analogWrite(PWM1, abs(pid_output)); // Set speed for Motor A
+    digitalWrite(DIR2, LOW); // Reverse for Motor B
+    analogWrite(PWM2, abs(pid_output)); // Set speed for Motor B
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  ps5.begin("1a:2b:3c:01:01:01");  // Replace with MAC address of your controller
+  Serial.println("Waiting for PS5 Controller...");
+
+  // Initialize motor control pins as outputs
+  pinMode(DIR1, OUTPUT);
+  pinMode(PWM1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  pinMode(PWM2, OUTPUT);
+}
+
+void loop() {
+  if (ps5.isConnected() && !controllerConnected) {
+    // If the controller has just connected, print message once
+    Serial.println("PS5 Controller Connected!");
+    controllerConnected = true;  // Set the flag to true
+  }
+
+  if (ps5.isConnected()) {
+    // Adjust Kp using D-pad up/down
+    if (ps5.Up()) {
+      Kp += 0.1;
+      Serial.print("Kp increased: ");
+      Serial.println(Kp);
+      delay(200);  // Debounce delay
+    }
+    if (ps5.Down()) {
+      Kp -= 0.1;
+      Serial.print("Kp decreased: ");
+      Serial.println(Kp);
+      delay(200);  // Debounce delay
+    }
+
+    // Adjust Ki using left/right buttons
+    if (ps5.Right()) {
+      Ki += 0.01;
+      Serial.print("Ki increased: ");
+      Serial.println(Ki);
+      delay(200);  // Debounce delay
+    }
+    if (ps5.Left()) {
+      Ki -= 0.01;
+      Serial.print("Ki decreased: ");
+      Serial.println(Ki);
+      delay(200);  // Debounce delay
+    }
+
+    // Adjust Kd using R1/L1 buttons
+    if (ps5.R1()) {
+      Kd += 0.01;
+      Serial.print("Kd increased: ");
+      Serial.println(Kd);
+      delay(200);  // Debounce delay
+    }
+    if (ps5.L1()) {
+      Kd -= 0.01;
+      Serial.print("Kd decreased: ");
+      Serial.println(Kd);
+      delay(200);  // Debounce delay
+    }
+
+    // Read sensor value (replace with actual sensor input)
+    input = getSensorValue();
+
+    // PID calculation
+    error = setpoint - input;
+    integral += error;
+    derivative = error - previous_error;
+    pid_output = Kp * error + Ki * integral + Kd * derivative;
+    previous_error = error;
+
+    // Apply PID output to motors
+    setMotorSpeed(pid_output);
+
+    // Delay for stability
+    delay(100);
+  } else if (!ps5.isConnected() && controllerConnected) {
+    // If the controller has disconnected, reset the flag
+    controllerConnected = false;
+    Serial.println("PS5 Controller Disconnected");
+  }
+}
+
+
+-------------------------------------------------------------------------
+part 2 
+
+
+
+
+#include <Wire.h>
+#include <MPU6050_light.h>
+#include <PID_v1.h>
+
+// กำหนดขาพินสำหรับมอเตอร์และเซ็นเซอร์ MPU6050
+#define DIR1 4    // Direction pin for Motor A
+#define PWM1 2    // PWM pin for Motor A
+#define DIR2 13   // Direction pin for Motor B
+#define PWM2 12   // PWM pin for Motor B
+
+// กำหนดพารามิเตอร์ของหุ่นยนต์
+const float WHEEL_RADIUS = 0.0345;  // หน้ายางล้อ 34.5 มม.
+const float WHEEL_DISTANCE = 0.170; // ระยะห่างระหว่างล้อ 170 มม.
+
+// สร้างออบเจ็กต์ของ MPU6050
+MPU6050 mpu(Wire);
+
+// ตัวแปรสำหรับ PID control
+double setpoint = 0;    // จุดตั้งสมดุล (0 องศา)
+double input = 0;       // มุมที่ได้จาก MPU6050 (มุมเอียงในแกน X)
+double output = 0;      // เอาต์พุตของ PID สำหรับควบคุมมอเตอร์
+double Kp = 1.5, Ki = 0.0, Kd = 0.0;  // ค่าการจูน PID
+
+// สร้าง PID object
+PID myPID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+
+// ฟังก์ชันควบคุมความเร็วของมอเตอร์
+void setMotorSpeeds(double speed) {
+  // ควบคุมมอเตอร์ A (ล้อซ้าย)
+  if (speed > 0) {
+    digitalWrite(DIR1, HIGH);  // หมุนไปข้างหน้า
+  } else {
+    digitalWrite(DIR1, LOW);   // หมุนถอยหลัง
+  }
+  analogWrite(PWM1, abs(speed));  // ควบคุมความเร็ว (0-255)
+
+  // ควบคุมมอเตอร์ B (ล้อขวา)
+  if (speed > 0) {
+    digitalWrite(DIR2, LOW);  // หมุนไปข้างหน้า (ทิศทางตรงข้าม)
+  } else {
+    digitalWrite(DIR2, HIGH); // หมุนถอยหลัง
+  }
+  analogWrite(PWM2, abs(speed));  // ควบคุมความเร็ว (0-255)
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  // เริ่มต้นการสื่อสาร I2C กับ MPU6050
+  Wire.begin(21, 22);
+
+  // เริ่มต้น MPU6050
+  byte status = mpu.begin();
+  if (status != 0) {
+    Serial.println("MPU6050 initialization failed!");
+    while (1);
+  }
+
+  // คาลิเบรตเซ็นเซอร์ MPU6050
+  mpu.calcOffsets();  // Takes about 5-10 seconds to calibrate
+
+  // เริ่มต้น PID controller
+  myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(-200, 200);
+
+  // กำหนดพินสำหรับมอเตอร์
+  pinMode(DIR1, OUTPUT);
+  pinMode(PWM1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  pinMode(PWM2, OUTPUT);
+
+  Serial.println("MPU6050 Initialized and Calibrated");
+}
+
+void loop() {
+  
+  // Check for incoming serial data
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    
+    if (command == "CALIBRATE") {
+      // Trigger MPU6050 calibration
+      mpu.calcOffsets();  // Calibrate the MPU6050
+      Serial.println("CALIBRATION DONE");  // Send calibration completion message
+    }
+  }
+
+  // Update MPU6050 data
+  mpu.update();
+
+  // Read the angle X (Pitch) from MPU6050
+  input = mpu.getAngleX();
+
+  // If the angle is greater than 0.5 degrees, activate PID and motors
+  if (abs(input) > 0.5) {
+    // Compute the PID output
+    myPID.Compute();
+
+    // Control motors based on the PID output
+    setMotorSpeeds(output);
+
+    // Print the angle X and motor speed to the Serial Monitor
+    Serial.print("Angle X: ");
+    Serial.print(input);
+    Serial.print(" | Motor Speed: ");
+    Serial.println(output);
+  } else {
+    Serial.println("Robot is stable.");
+  }
+
+  delay(100);  // Delay for readability and to reduce load
+}
