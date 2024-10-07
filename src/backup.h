@@ -303,64 +303,142 @@ void calculateSpeedAndAngularVelocity() {
     last_display_time = current_time;  // Update the last display time
   }
 }
+
+
 void readSerialAndSetParameters() {
-    if (Serial.available() > 0) {
-        String inputString = Serial.readStringUntil('\n');
 
-        // Check for "f" command to move forward by increasing setpoint_balance by 0.3
-        if (inputString == "f") {
-            setpoint_balance += 1.2;
-            Serial.print("Moving forward, increasing setpoint_balance by 0.3. New setpoint_balance: ");
-            Serial.println(setpoint_balance);
-            return;
-        }
+  // if (Serial.available() > 0) {
+  //   String inputString = Serial.readStringUntil('\n');
 
-        // Check for "b" command to move backward by decreasing setpoint_balance by 0.3
-        if (inputString == "b") {
-            setpoint_balance -= 1.2;
-            Serial.print("Moving backward, decreasing setpoint_balance by 0.3. New setpoint_balance: ");
-            Serial.println(setpoint_balance);
-            return;
-        }
+  //   int firstCommaIndex = inputString.indexOf(',');
+  //   int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
+  //   int thirdCommaIndex = inputString.indexOf(',', secondCommaIndex + 1);
+  //   int fourthCommaIndex = inputString.indexOf(',', thirdCommaIndex + 1);
+  //   int fifthCommaIndex = inputString.indexOf(',', fourthCommaIndex + 1);
 
-        // Check for "s" command to stabilize robot by setting setpoint_balance to -1.5
-        if (inputString == "s") {
-            setpoint_balance = -1.5;
-            Serial.print("Stabilizing robot, setting setpoint_balance to -1.5. New setpoint_balance: ");
-            Serial.println(setpoint_balance);
-            return;
-        }
+  //   // อ่านค่า speed_m1 และ speed_m2
+  //   setpoint_speed1 = inputString.substring(0, firstCommaIndex).toFloat();
+  //   setpoint_speed2 = inputString.substring(firstCommaIndex + 1).toFloat();
 
-        // Split input string using commas for PID tuning and setpoint_balance settings
-        int firstCommaIndex = inputString.indexOf(',');
-        int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
-        int thirdCommaIndex = inputString.indexOf(',', secondCommaIndex + 1);
+  //   // อ่านค่า PID
+  //   Kp_speed = inputString.substring(secondCommaIndex + 1, thirdCommaIndex).toFloat();
+  //   Ki_speed = inputString.substring(thirdCommaIndex + 1, fourthCommaIndex).toFloat();
+  //   Kd_speed = inputString.substring(fourthCommaIndex + 1, fifthCommaIndex).toFloat();
 
-        if (firstCommaIndex > 0 && secondCommaIndex > firstCommaIndex && thirdCommaIndex > secondCommaIndex) {
-            // Parse setpoint balance
-            setpoint_balance = inputString.substring(0, firstCommaIndex).toFloat();
+  // if (setpoint_speed1 == 0 && setpoint_speed2 == 0) {
+  //   output_speed1 = 0;
+  //   output_speed2 = 0;
+  //   Kp_speed = 0;
+  //   Ki_speed = 0;
+  //   Kd_speed = 0;
+  //   pid_speed1.SetMode(MANUAL);
+  //   pid_speed1.SetTunings(Kp_speed, Ki_speed, Kd_speed);
+  //   pid_speed1.SetMode(AUTOMATIC);
+  //   pid_speed2.SetMode(MANUAL);
+  //   pid_speed2.SetTunings(Kp_speed, Ki_speed, Kd_speed);
+  //   pid_speed2.SetMode(AUTOMATIC);
+  //   Serial.println(" STOP ");
+  // }
+  //   else {
+  //     Kp_speed = 20;
+  //     Ki_speed = 500;
+  //     Kd_speed = 0.0;
+  //   }
+  //   Serial.print("Motor 1 Speed: ");
+  //   Serial.print(setpoint_speed1);
+  //   Serial.print(", Motor 2 Speed: ");
+  //   Serial.print(setpoint_speed2);
 
-            // Parse PID parameters
-            Kp_balance = inputString.substring(firstCommaIndex + 1, secondCommaIndex).toFloat();
-            Ki_balance = inputString.substring(secondCommaIndex + 1, thirdCommaIndex).toFloat();
-            Kd_balance = inputString.substring(thirdCommaIndex + 1).toFloat();
+  //   Serial.print(", PID: P=");
+  //   Serial.print(Kp_speed);
+  //   Serial.print(", I=");
+  //   Serial.print(Ki_speed);
+  //   Serial.print(", D=");
+  //   Serial.println(Kd_speed);
+  // }
 
-            // Display setpoint and PID parameters
-            Serial.print("Setpoint Balance: ");
-            Serial.print(setpoint_balance);
-            Serial.print(", PID: P=");
-            Serial.print(Kp_balance);
-            Serial.print(", I=");
-            Serial.print(Ki_balance);
-            Serial.print(", D=");
-            Serial.println(Kd_balance);
+  // pid_speed1.SetTunings(Kp_speed, Ki_speed, Kd_speed);
+  // pid_speed2.SetTunings(Kp_speed, Ki_speed, Kd_speed);
 
-            // Update PID controller with new parameters
-            pid_balance.SetTunings(Kp_balance, Ki_balance, Kd_balance);
-        } else {
-            Serial.println("Invalid input format. Please use: setpoint_balance,Kp_balance,Ki_balance,Kd_balance");
-        }
-    }
+
+  // if (Serial.available() > 0) {
+  //   String inputString = Serial.readStringUntil('\n');
+
+  //   int firstCommaIndex = inputString.indexOf(',');
+  //   int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
+  //   int thirdCommaIndex = inputString.indexOf(',', secondCommaIndex + 1);
+  //   int fourthCommaIndex = inputString.indexOf(',', thirdCommaIndex + 1);
+  //   int fifthCommaIndex = inputString.indexOf(',', fourthCommaIndex + 1);
+
+  //   //linear_velocity max = 0.392 angular_velocity max = 3.454
+  //   linear_velocity = inputString.substring(0, firstCommaIndex).toFloat();
+  //   angular_velocity = inputString.substring(firstCommaIndex + 1).toFloat();
+
+  //   Serial.print("SP linear_velocity: ");
+  //   Serial.print(linear_velocity);
+  //   Serial.print(", SP angular_velocity: ");
+  //   Serial.println(angular_velocity);
+  // }
+
+  if (Serial.available() > 0) {
+    String inputString = Serial.readStringUntil('\n');
+
+    int firstCommaIndex = inputString.indexOf(',');
+    int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
+    int thirdCommaIndex = inputString.indexOf(',', secondCommaIndex + 1);
+    int fourthCommaIndex = inputString.indexOf(',', thirdCommaIndex + 1);
+
+    setpoint_balance = inputString.substring(0, firstCommaIndex).toFloat();
+    // อ่านค่า PID
+    Kp_balance = inputString.substring(firstCommaIndex + 1, secondCommaIndex).toFloat();
+    Ki_balance = inputString.substring(secondCommaIndex + 1, thirdCommaIndex).toFloat();
+    Kd_balance = inputString.substring(thirdCommaIndex + 1, fourthCommaIndex).toFloat();
+
+    // if (KalmanAngleRoll > 25 || KalmanAngleRoll < -25) {
+    //   output_balance = 0;
+    //   Kp_balance = 0;
+    //   Ki_balance = 0;
+    //   Kd_balance = 0;
+    //   pid_balance.SetMode(MANUAL);
+    //   pid_balance.SetTunings(Kp_balance, Ki_balance, Kd_balance);
+    //   pid_balance.SetMode(AUTOMATIC);
+    //   Serial.println(" STOP ");
+    // }
+    // else {
+    //   Kp_speed = 20;
+    //   Ki_speed = 500;
+    //   Kd_speed = 0.0;
+    // }
+    Serial.print("Setpoint Balance: ");
+    Serial.print(setpoint_balance);
+
+    Serial.print(", PID: P=");
+    Serial.print(Kp_balance);
+    Serial.print(", I=");
+    Serial.print(Ki_balance);
+    Serial.print(", D=");
+    Serial.println(Kd_balance);
+
+    pid_balance.SetTunings(Kp_balance, Ki_balance, Kd_balance);
+  }
+
+
+  // if (Serial.available() > 0) {
+  //   String inputString = Serial.readStringUntil('\n');
+
+  //   int firstCommaIndex = inputString.indexOf(',');
+  //   int secondCommaIndex = inputString.indexOf(',', firstCommaIndex + 1);
+  //   int thirdCommaIndex = inputString.indexOf(',', secondCommaIndex + 1);
+  //   int fourthCommaIndex = inputString.indexOf(',', thirdCommaIndex + 1);
+
+  //   linear_velocity = inputString.substring(0, firstCommaIndex).toFloat();
+  //   angular_velocity = inputString.substring(firstCommaIndex + 1, secondCommaIndex).toFloat();
+
+  //   Serial.print(" linear_velocity: ");
+  //   Serial.print(linear_velocity);
+  //   Serial.print(" angular_velocity: ");
+  //   Serial.println(angular_velocity);
+  // }
 }
 
 

@@ -38,27 +38,30 @@
 // MotorControl.h
 // MotorControl.h
 
-#include "MotorControl.h"
+#ifndef MOTOR_CONTROL_H
+#define MOTOR_CONTROL_H
 
-// Define the MPU6050 object
-MPU6050 mpu(Wire);
+#include <MPU6050_light.h>
+#include <Wire.h>
 
-// Define the PID control variables
-double setpoint = 0;
-double input = 0;
-double output = 0;
-double Kp = 1.0, Ki = 0.5, Kd = 0.1;
+// Define motor control pins (change the pin numbers as per your setup)
+#define DIR1 4    // Direction pin for Motor A
+#define PWM1 2    // PWM pin for Motor A
+#define DIR2 13   // Direction pin for Motor B
+#define PWM2 12   // PWM pin for Motor B
 
-// Define the motor control function
-void setMotorSpeeds(double speed) {
-  if (speed > 0) {
-    digitalWrite(DIR1, HIGH);
-    digitalWrite(DIR2, HIGH);
-  } else {
-    digitalWrite(DIR1, LOW);
-    digitalWrite(DIR2, LOW);
-  }
+// Declare the MPU6050 object as extern
+extern MPU6050 mpu;
 
-  analogWrite(PWM1, abs(speed));  // Motor A
-  analogWrite(PWM2, abs(speed));  // Motor B
-}
+// Declare PID control variables as extern
+extern double setpoint;
+extern double input;
+extern double output;
+extern double Kp;
+extern double Ki;
+extern double Kd;
+
+// Function to control motor speeds
+void setMotorSpeeds(double speed);
+
+#endif // MOTOR_CONTROL_H
